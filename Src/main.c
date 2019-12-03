@@ -73,12 +73,20 @@ void CUSTOM_GPIO_Init(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-void 		delay(int ms)
+void delay(int ms)
 {
 	uint32_t v = HAL_GetTick() + ms;
 	while(HAL_GetTick() < v){
 		__nop();
 	}
+}
+void setMotorPwm(int sign, VL6180x_RangeData_t range, uint32_t channel)
+{
+	 int basePwm = 1340;
+	 if(range.range_mm < 150) {
+		 basePwm += sign * (500 - range.range_mm *3);
+	 }
+	 __HAL_TIM_SET_COMPARE(&htim1,channel,basePwm);
 }
 
 /* USER CODE END 0 */
@@ -87,6 +95,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+	VL6180x_RangeData_t rangeLeft;
+	VL6180x_RangeData_t rangeRight;
 
   /* USER CODE END 1 */
 
@@ -148,7 +158,12 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-
+		VL6180x_RangePollMeasurement(rightSensor, &rangeRight);
+		VL6180x_RangePollMeasurement(leftSensor, &rangeLeft);
+		int minRange = rangeLeft.range_mm < rangeRight.range_mm ? rangeLeft.range_mm : rangeRight.range_mm;
+ 		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, minRange < 200 ? (1000 - minRange * 5 ): 0);
+		setMotorPwm(-1, rangeRight, TIM_CHANNEL_1);
+		setMotorPwm(1, rangeLeft, TIM_CHANNEL_3);
   }
   /* USER CODE END 3 */
 
@@ -239,7 +254,7 @@ void MX_TIM1_Init(void)
   HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig);
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 1200;
+  sConfigOC.Pulse = 1340;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -276,7 +291,7 @@ void MX_TIM3_Init(void)
   HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig);
 
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 500;
+  sConfigOC.Pulse = 120;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3);
